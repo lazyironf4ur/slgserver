@@ -21,13 +21,14 @@ var DefaultChat = Chat{
 }
 
 type Chat struct {
-	unionMutex	sync.RWMutex
-	worldGroup *logic.Group          //世界频道
-	unionGroups map[int]*logic.Group //联盟频道
-	ridToUnionGroups map[int]int     //rid对应的联盟频道
+	unionMutex       sync.RWMutex
+	worldGroup       *logic.Group         //世界频道
+	unionGroups      map[int]*logic.Group //联盟频道
+	ridToUnionGroups map[int]int          //rid对应的联盟频道
 }
 
-func (this*Chat) InitRouter(r *net.Router) {
+// add comment
+func (this *Chat) InitRouter(r *net.Router) {
 	g := r.Group("chat").Use(middleware.ElapsedTime(), middleware.Log())
 
 	g.AddRouter("login", this.login)
@@ -38,7 +39,7 @@ func (this*Chat) InitRouter(r *net.Router) {
 	g.AddRouter("exit", this.exit, middleware.CheckRId())
 }
 
-func (this*Chat) login(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
+func (this *Chat) login(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
 	reqObj := &proto.LoginReq{}
 	rspObj := &proto.LoginRsp{}
 	rsp.Body.Code = constant.OK
@@ -49,11 +50,11 @@ func (this*Chat) login(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
 	rspObj.NickName = reqObj.NickName
 
 	sess, err := util.ParseSession(reqObj.Token)
-	if err != nil{
+	if err != nil {
 		rsp.Body.Code = constant.InvalidParam
 		return
 	}
-	if sess.IsValid() == false || sess.Id != reqObj.RId{
+	if sess.IsValid() == false || sess.Id != reqObj.RId {
 		rsp.Body.Code = constant.InvalidParam
 		return
 	}
@@ -62,7 +63,7 @@ func (this*Chat) login(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
 	this.worldGroup.Enter(logic.NewUser(reqObj.RId, reqObj.NickName))
 }
 
-func (this*Chat) logout(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
+func (this *Chat) logout(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
 	reqObj := &proto.LogoutReq{}
 	rspObj := &proto.LogoutRsp{}
 	rsp.Body.Code = constant.OK
@@ -75,7 +76,7 @@ func (this*Chat) logout(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
 	this.worldGroup.Exit(reqObj.RId)
 }
 
-func (this*Chat) chat(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
+func (this *Chat) chat(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
 	reqObj := &proto.ChatReq{}
 	rspObj := &proto.ChatMsg{}
 	rsp.Body.Code = constant.OK
@@ -88,7 +89,7 @@ func (this*Chat) chat(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
 	if reqObj.Type == 0 {
 		//世界聊天
 		rsp.Body.Msg = this.worldGroup.PutMsg(reqObj.Msg, rid, 0)
-	}else if reqObj.Type == 1{
+	} else if reqObj.Type == 1 {
 		//联盟聊天
 		this.unionMutex.RLock()
 		id, ok := this.ridToUnionGroups[rid]
@@ -96,10 +97,10 @@ func (this*Chat) chat(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
 			g, ok := this.unionGroups[id]
 			if ok {
 				g.PutMsg(reqObj.Msg, rid, 1)
-			}else{
+			} else {
 				log.DefaultLog.Warn("chat not found rid in unionGroups", zap.Int("rid", rid))
 			}
-		}else{
+		} else {
 			log.DefaultLog.Warn("chat not found rid in ridToUnionGroups", zap.Int("rid", rid))
 		}
 		this.unionMutex.RUnlock()
@@ -108,7 +109,7 @@ func (this*Chat) chat(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
 }
 
 //历史记录
-func (this*Chat) history(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
+func (this *Chat) history(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
 	reqObj := &proto.HistoryReq{}
 	rspObj := &proto.HistoryRsp{}
 	rsp.Body.Code = constant.OK
@@ -121,7 +122,7 @@ func (this*Chat) history(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
 	if reqObj.Type == 0 {
 		r := this.worldGroup.History()
 		rspObj.Msgs = r
-	}else if reqObj.Type == 1 {
+	} else if reqObj.Type == 1 {
 		this.unionMutex.RLock()
 		id, ok := this.ridToUnionGroups[rid]
 		if ok {
@@ -136,7 +137,7 @@ func (this*Chat) history(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
 	rsp.Body.Msg = rspObj
 }
 
-func (this*Chat) join(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
+func (this *Chat) join(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
 	reqObj := &proto.JoinReq{}
 	rspObj := &proto.JoinRsp{}
 	rsp.Body.Code = constant.OK
@@ -157,7 +158,7 @@ func (this*Chat) join(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
 		if ok {
 			if gId != reqObj.Id {
 				//联盟聊天只能有一个，顶掉旧的
-				if g,ok := this.unionGroups[gId]; ok {
+				if g, ok := this.unionGroups[gId]; ok {
 					g.Exit(rid)
 				}
 
@@ -168,7 +169,7 @@ func (this*Chat) join(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
 				this.ridToUnionGroups[rid] = reqObj.Id
 				this.unionGroups[reqObj.Id].Enter(u)
 			}
-		}else{
+		} else {
 			//新加入
 			_, ok = this.unionGroups[reqObj.Id]
 			if ok == false {
@@ -181,7 +182,7 @@ func (this*Chat) join(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
 	}
 }
 
-func (this*Chat) exit(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
+func (this *Chat) exit(req *net.WsMsgReq, rsp *net.WsMsgRsp) {
 	reqObj := &proto.ExitReq{}
 	rspObj := &proto.ExitRsp{}
 	rsp.Body.Code = constant.OK
